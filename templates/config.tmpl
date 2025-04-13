@@ -1,0 +1,223 @@
+{{- /* 
+  config.tmpl – A Go template that produces config.go for the new CLI project.
+
+  Usage:
+    text/template is used to replace:
+      .ProjectName => e.g. "shoes"
+      .HomeDir => e.g. "~/shoes"
+*/ -}}
+package config
+
+import (
+  "encoding/json"
+  "fmt"
+  "os"
+  "os/user"
+  "path/filepath"
+  "reflect"
+  "strings"
+
+  "gopkg.in/yaml.v3"
+)
+
+// Config is the user-facing configuration for {{.ProjectName}}.
+//
+// Fields are annotated with a 'config' tag that allows reflection-based
+// description, defaulting, etc.
+type Config struct {
+  // Example: Using {{.HomeDir}} as the default, or fallback if empty
+  HomeDir string `yaml:"home" config:"desc=Base directory for storing data,default={{.HomeDir}}"`
+  Author  string `yaml:"author" config:"desc=Default author name for new items"`
+  LogFmt  string `yaml:"log_fmt" config:"desc=Log output format (json, formatted, text),default=json"`
+}
+
+// defaultConfig includes fallback fields – e.g., sets HomeDir to {{.HomeDir}}
+var defaultConfig = Config{
+  HomeDir: "{{.HomeDir}}",
+  LogFmt:  "json",
+  Author:  fallbackAuthor(),
+}
+
+// fallbackAuthor attempts to glean an OS username or fallback to the base of $HOME
+func fallbackAuthor() string {
+  if u, err := user.Current(); err == nil && u.Username != "" {
+    return u.Username
+  }
+  if home, err := os.UserHomeDir(); err == nil {
+    return filepath.Base(home)
+  }
+  return "unknown"
+}
+
+// Path returns the location of this project's config file.
+func Path() string {
+  if path := os.Getenv("CONFIG_PATH"); path != "" {
+    return path
+  }
+  if home, err := os.UserHomeDir(); err == nil {
+    return filepath.Join(home, ".config", "{{.ProjectName}}", "config.yaml")
+  }
+  return filepath.Join(".", "config.yaml")
+}
+
+// Load reads the config from disk, applying defaults.
+func Load() (*Config, error) {
+  path := Path()
+  data, err := os.ReadFile(path)
+  if err != nil && !os.IsNotExist(err) {
+    return nil, fmt.Errorf("failed to read config: %w", err)
+  }
+
+  cfg := defaultConfig // allow defaults
+  if err := yaml.Unmarshal(data, &cfg); err != nil {
+    return nil, fmt.Errorf("failed to parse config: %w", err)
+  }
+  return &cfg, nil
+}
+
+// Save writes the config back to disk in YAML.
+func Save(cfg *Config) error {
+  path := Path()
+  dir := filepath.Dir(path)
+  if err := os.MkdirAll(dir, 0755); err != nil {
+    return fmt.Errorf("failed to make config dir: %w", err)
+  }
+
+  out, err := yaml.Marshal(cfg)
+  if err != nil {
+    return fmt.Errorf("failed to marshal config: %w", err)
+  }
+  if err := os.WriteFile(path, out, 0644); err != nil {
+    return fmt.Errorf("failed to write config: %w", err)
+  }
+  return nil
+}
+
+// Set modifies one field, saving immediately.
+func Set(key, value string) error {
+  cfg, err := Load()
+  if err != nil {
+    return err
+  }
+
+  rv := reflect.ValueOf(cfg).Elem()
+  rt := rv.Type()
+
+  found := false
+  for i := 0; i < rv.NumField(); i++ {
+    yamlTag := rt.Field(i).Tag.Get("yaml")
+    if yamlTag == key {
+      if key == "home" {
+        absPath, err := filepath.Abs(value)
+        if err == nil {
+          value = absPath
+        }
+      }
+      rv.Field(i).SetString(value)
+      found = true
+      break
+    }
+  }
+  if !found {
+    return fmt.Errorf("unknown config key: %s", key)
+  }
+
+  return Save(cfg)
+}
+
+// Get fetches the current value for one field.
+func Get(key string) (string, error) {
+  cfg, err := Load()
+  if err != nil {
+    return "", err
+  }
+
+  rv := reflect.ValueOf(cfg).Elem()
+  rt := rv.Type()
+
+  for i := 0; i < rv.NumField(); i++ {
+    yamlTag := rt.Field(i).Tag.Get("yaml")
+    if yamlTag == key {
+      return rv.Field(i).String(), nil
+    }
+  }
+  return "", fmt.Errorf("unknown config key: %s", key)
+}
+
+// Describe returns a text-based listing of config fields, with current or default values.
+func Describe() ([]string, error) {
+  cfg, err := Load()
+  if err != nil {
+    return nil, err
+  }
+
+  rv := reflect.ValueOf(cfg).Elem()
+  rt := rv.Type()
+  var out []string
+
+  for i := 0; i < rv.NumField(); i++ {
+    field := rt.Field(i)
+    yamlTag := field.Tag.Get("yaml")
+    descTag := field.Tag.Get("config")
+
+    parts := parseTag(descTag)
+    value := rv.Field(i).String()
+    if strings.TrimSpace(value) == "" && parts["default"] != "" {
+      value = parts["default"]
+    }
+    desc := parts["desc"]
+
+    out = append(out, fmt.Sprintf("  %s = %s\n    → %s", yamlTag, value, desc))
+  }
+  return out, nil
+}
+
+// DescribeJSON returns the config in structured JSON with desc & default
+func DescribeJSON() ([]byte, error) {
+  cfg, err := Load()
+  if err != nil {
+    return nil, err
+  }
+
+  rv := reflect.ValueOf(cfg).Elem()
+  rt := rv.Type()
+
+  type fieldMeta struct {
+    Value   string `json:"value"`
+    Desc    string `json:"desc"`
+    Default string `json:"default"`
+  }
+
+  results := make(map[string]fieldMeta)
+  for i := 0; i < rv.NumField(); i++ {
+    field := rt.Field(i)
+    yamlKey := field.Tag.Get("yaml")
+    cfgTag := field.Tag.Get("config")
+    parts := parseTag(cfgTag)
+
+    val := rv.Field(i).String()
+    if val == "" {
+      val = parts["default"]
+    }
+
+    results[yamlKey] = fieldMeta{
+      Value:   val,
+      Desc:    parts["desc"],
+      Default: parts["default"],
+    }
+  }
+
+  return json.MarshalIndent(results, "", "  ")
+}
+
+// parseTag splits 'desc=...,default=...' into a map for reflection-based config.
+func parseTag(tag string) map[string]string {
+  out := make(map[string]string)
+  for _, part := range strings.Split(tag, ",") {
+    kv := strings.SplitN(strings.TrimSpace(part), "=", 2)
+    if len(kv) == 2 {
+      out[kv[0]] = kv[1]
+    }
+  }
+  return out
+}

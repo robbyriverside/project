@@ -1,0 +1,23 @@
+version: '3'
+
+tasks:
+  build:
+    desc: Build the 'project' CLI
+    cmds:
+      - mkdir -p bin
+      - go build -o bin/project cmd/project/main.go
+    sources:
+      - "**/*.go"
+    generates:
+      - "bin/project"
+
+  run:
+    desc: Run the 'project' CLI from source
+    cmds:
+      - go run cmd/project/main.go {{.CLI_ARGS}}
+    silent: true
+
+  clean:
+    desc: Remove built artifacts
+    cmds:
+      - rm -rf bin

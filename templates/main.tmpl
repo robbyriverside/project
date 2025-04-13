@@ -1,0 +1,56 @@
+package main
+
+import (
+  "fmt"
+  "os"
+
+  "github.com/jessevdk/go-flags"
+
+  "github.com/example/{{.ProjectName}}/logs"
+)
+
+// Version, Commit, and BuildTime are set at build time via -ldflags.
+var (
+  Version   string
+  Commit    string
+  BuildTime string
+)
+
+// Options are top-level CLI flags.
+type Options struct {
+  Verbose bool `short:"v" long:"verbose" description:"Enable verbose logging"`
+}
+
+func main() {
+  var opts Options
+  parser := flags.NewParser(&opts, flags.Default)
+
+  parser.AddCommand(
+    "version",
+    "Show version info",
+    "Prints version, commit, and build time",
+    &VersionCommand{},
+  )
+
+  _, err := parser.Parse()
+  if err != nil {
+    os.Exit(1)
+  }
+
+  logs.Options.Verbose = opts.Verbose
+  logs.Options.AppName = "{{.ProjectName}}"
+  logs.Options.Version = Version
+  logs.InitLogger(os.Getenv("ENV"))
+
+  logs.Logger().Infof("Starting {{.ProjectName}} (version=%s, commit=%s, built=%s)",
+    Version, Commit, BuildTime)
+}
+
+// VersionCommand prints out version info
+type VersionCommand struct{}
+
+func (cmd *VersionCommand) Execute(args []string) error {
+  fmt.Printf("{{.ProjectName}}\n  Version:   %s\n  Commit:    %s\n  BuildTime: %s\n",
+    Version, Commit, BuildTime)
+  return nil
+}

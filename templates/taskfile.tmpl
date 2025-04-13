@@ -1,0 +1,50 @@
+version: '3'
+
+vars:
+  APP: {{.ProjectName}}
+  MAIN: ./cmd/{{.ProjectName}}
+  OUT: bin/{{.ProjectName}}
+
+  VERSION:
+    sh: git describe --tags --always --dirty
+  COMMIT:
+    sh: git rev-parse HEAD
+  BUILDTIME:
+    sh: date -u +%Y-%m-%dT%H:%M:%SZ
+
+  # We need to produce literal {{.VERSION}}, etc. in the final Taskfile,
+  # so we escape braces using {{ "{{.VERSION}}" }} to ensure the Go template
+  # doesn't consume them.
+  LDFLAGS: >-
+    -X 'main.Version={{ "{{.VERSION}}" }}'
+    -X 'main.Commit={{ "{{.COMMIT}}" }}'
+    -X 'main.BuildTime={{ "{{.BUILDTIME}}" }}'
+
+tasks:
+  build:
+    desc: Build the CLI with version info
+    cmds:
+      - mkdir -p bin
+      - go build -ldflags '{{ "{{.LDFLAGS}}" }}' -o {{ "{{.OUT}}" }} {{ "{{.MAIN}}" }}
+    sources:
+      - "**/*.go"
+    generates:
+      - '{{ "{{.OUT}}" }}'
+
+  run:
+    desc: Run the CLI
+    cmds:
+      - go run {{ "{{.MAIN}}" }} {{ "{{.CLI_ARGS}}" }}
+    silent: true
+
+  clean:
+    desc: Remove the bin folder
+    cmds:
+      - rm -rf bin
+
+  version:
+    desc: Show build version metadata
+    cmds:
+      - echo 'Version = {{ "{{.VERSION}}" }}'
+      - echo 'Commit = {{ "{{.COMMIT}}" }}'
+      - echo 'Built at = {{ "{{.BUILDTIME}}" }}'
