@@ -25,15 +25,15 @@ import (
 // Fields are annotated with a 'config' tag that allows reflection-based
 // description, defaulting, etc.
 type Config struct {
-  // Example: Using {{.HomeDir}} as the default, or fallback if empty
-  HomeDir string `yaml:"home" config:"desc=Base directory for storing data,default={{.HomeDir}}"`
+  // Example: Using ~/dev/{{.ProjectName}} as the default, or fallback if empty
+  HomeDir string `yaml:"home" config:"desc=Base directory for storing data,default=~/dev/{{.ProjectName}}"`
   Author  string `yaml:"author" config:"desc=Default author name for new items"`
   LogFmt  string `yaml:"log_fmt" config:"desc=Log output format (json, formatted, text),default=json"`
 }
 
-// defaultConfig includes fallback fields – e.g., sets HomeDir to {{.HomeDir}}
+// defaultConfig includes fallback fields – e.g., sets HomeDir to ~/dev/{{.ProjectName}}
 var defaultConfig = Config{
-  HomeDir: "{{.HomeDir}}",
+  HomeDir: "~/dev/{{.ProjectName}}",
   LogFmt:  "json",
   Author:  fallbackAuthor(),
 }

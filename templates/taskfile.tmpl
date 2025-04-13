@@ -26,6 +26,7 @@ tasks:
     cmds:
       - mkdir -p bin
       - go build -ldflags '{{ "{{.LDFLAGS}}" }}' -o {{ "{{.OUT}}" }} {{ "{{.MAIN}}" }}
+      - chmod +x {{ "{{.OUT}}" }}
     sources:
       - "**/*.go"
     generates:

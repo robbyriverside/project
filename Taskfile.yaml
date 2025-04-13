@@ -6,6 +6,7 @@ tasks:
     cmds:
       - mkdir -p bin
       - go build -o bin/project cmd/project/main.go
+      - chmod +x bin/project
     sources:
       - "**/*.go"
     generates:

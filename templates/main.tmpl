@@ -3,9 +3,11 @@ package main
 import (
   "fmt"
   "os"
+  "strings"
 
   "github.com/jessevdk/go-flags"
 
+  "github.com/example/{{.ProjectName}}/config"
   "github.com/example/{{.ProjectName}}/logs"
 )
 
@@ -32,6 +34,13 @@ func main() {
     &VersionCommand{},
   )
 
+  parser.AddCommand(
+    "config",
+    "Manage configuration",
+    "Get or set configuration values",
+    &ConfigCommand{},
+  )
+
   _, err := parser.Parse()
   if err != nil {
     os.Exit(1)
@@ -52,5 +61,64 @@ type VersionCommand struct{}
 func (cmd *VersionCommand) Execute(args []string) error {
   fmt.Printf("{{.ProjectName}}\n  Version:   %s\n  Commit:    %s\n  BuildTime: %s\n",
     Version, Commit, BuildTime)
+  return nil
+}
+
+// ConfigCommand handles the 'config' subcommand
+type ConfigCommand struct {
+  Get      GetConfigCmd      `command:"get" description:"Get a config value"`
+  Set      SetConfigCmd      `command:"set" description:"Set a config value"`
+  Describe DescribeConfigCmd `command:"describe" description:"Show config info"`
+}
+
+func (cmd *ConfigCommand) Execute(args []string) error {
+  return fmt.Errorf("Please specify one command of: %s", strings.Join([]string{"describe", "get", "set"}, ", "))
+}
+
+// GetConfigCmd handles 'config get <key>'
+type GetConfigCmd struct {
+  Args struct {
+    Key string `positional-arg-name:"key" description:"Config key to get"`
+  } `positional-args:"yes" required:"yes"`
+}
+
+func (cmd *GetConfigCmd) Execute(args []string) error {
+  value, err := config.Get(cmd.Args.Key)
+  if err != nil {
+    return err
+  }
+  fmt.Printf("%s = %s\n", cmd.Args.Key, value)
+  return nil
+}
+
+// SetConfigCmd handles 'config set <key> <value>'
+type SetConfigCmd struct {
+  Args struct {
+    Key   string `positional-arg-name:"key" description:"Config key to set"`
+    Value string `positional-arg-name:"value" description:"Value to set"`
+  } `positional-args:"yes" required:"yes"`
+}
+
+func (cmd *SetConfigCmd) Execute(args []string) error {
+  err := config.Set(cmd.Args.Key, cmd.Args.Value)
+  if err != nil {
+    return err
+  }
+  fmt.Printf("%s = %s\n", cmd.Args.Key, cmd.Args.Value)
+  return nil
+}
+
+// DescribeConfigCmd handles 'config describe'
+type DescribeConfigCmd struct{}
+
+func (cmd *DescribeConfigCmd) Execute(args []string) error {
+  fmt.Printf("{{.ProjectName}} config file: %s\n", config.Path())
+  lines, err := config.Describe()
+  if err != nil {
+    return err
+  }
+  for _, line := range lines {
+    fmt.Println(line)
+  }
   return nil
 }

@@ -213,6 +213,28 @@ replace (
 		})
 	}
 
+	// After all files are written, check if .gitignore exists and append bin/* if needed
+	gitignorePath := filepath.Join(outputDir, ".gitignore")
+	if _, err := os.Stat(gitignorePath); err == nil {
+		// .gitignore exists, check if bin/* is already in it
+		content, err := os.ReadFile(gitignorePath)
+		if err != nil {
+			t.Fatalf("failed to read .gitignore: %v", err)
+		}
+		if !strings.Contains(string(content), "bin/*") {
+			// Append bin/* to .gitignore
+			f, err := os.OpenFile(gitignorePath, os.O_APPEND|os.O_WRONLY, 0644)
+			if err != nil {
+				t.Fatalf("failed to open .gitignore for append: %v", err)
+			}
+			if _, err := f.WriteString("\n# Binary output directory\nbin/*\n"); err != nil {
+				f.Close()
+				t.Fatalf("failed to append to .gitignore: %v", err)
+			}
+			f.Close()
+		}
+	}
+
 	// After all files are written, initialize the module
 	cmd := exec.Command("go", "mod", "tidy")
 	cmd.Dir = outputDir
