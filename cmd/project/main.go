@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/jessevdk/go-flags"
 
@@ -93,27 +94,67 @@ func (cmd *ConfigDescribeCommand) Execute(args []string) error {
 
 // gen command
 type GenCommand struct {
-	// A required positional argument for the module URL, e.g. "github.com/rrs/shoes"
+	// A required positional argument for the GitHub URL, e.g. "https://github.com/rrs/shoes"
 	Args struct {
-		ModuleURL string `positional-arg-name:"moduleURL" required:"true"`
+		GitURL string `positional-arg-name:"gitURL" required:"true" description:"GitHub URL (same as git clone URL)"`
 	} `positional-args:"yes"`
 
-	// An optional flag to override the output directory, defaults to current dir
-	Dir string `short:"d" long:"dir" description:"Output directory" default:"."`
+	// An optional flag to override the output directory, defaults to repo name
+	Dir string `short:"d" long:"dir" description:"Output directory (defaults to repository name)"`
 }
 
 func (cmd *GenCommand) Execute(args []string) error {
+	// Convert GitHub URL to module URL and get repo name
+	// Examples:
+	// https://github.com/user/repo.git -> github.com/user/repo
+	// git@github.com:user/repo.git -> github.com/user/repo
+	gitURL := cmd.Args.GitURL
+	moduleURL := gitURL
+	var repoName string
+
+	// Handle https:// URLs
+	if strings.HasPrefix(gitURL, "https://github.com/") {
+		moduleURL = strings.TrimPrefix(gitURL, "https://")
+	}
+
+	// Handle git@ URLs
+	if strings.HasPrefix(gitURL, "git@github.com:") {
+		moduleURL = strings.Replace(strings.TrimPrefix(gitURL, "git@"), ":", "/", 1)
+	}
+
+	// Remove .git suffix if present
+	moduleURL = strings.TrimSuffix(moduleURL, ".git")
+
+	// Extract repository name from moduleURL
+	parts := strings.Split(moduleURL, "/")
+	if len(parts) >= 3 {
+		repoName = parts[len(parts)-1]
+	} else {
+		return fmt.Errorf("invalid GitHub URL format")
+	}
+
+	// Use repository name as output directory if --dir not specified
+	outputDir := cmd.Dir
+	if outputDir == "" {
+		outputDir = repoName
+	}
+
+	// Create output directory if it doesn't exist
+	if err := os.MkdirAll(outputDir, 0755); err != nil {
+		return fmt.Errorf("failed to create output directory: %w", err)
+	}
+
 	// Create your Generator with a TmplDir pointing to where your .tmpl files live
 	gen := &project.Generator{
 		TmplDir: "templates", // or wherever your templates/ folder is located
 	}
 
-	// Call GenerateAll with the user-provided moduleURL & dir
-	if err := gen.GenerateAll(cmd.Args.ModuleURL, cmd.Dir); err != nil {
+	// Call GenerateAll with the processed moduleURL & dir
+	if err := gen.GenerateAll(moduleURL, outputDir); err != nil {
 		return fmt.Errorf("failed to generate project: %w", err)
 	}
 
-	fmt.Println("Project generation complete!")
+	fmt.Printf("Project generated in ./%s\nModule URL: %s\n", outputDir, moduleURL)
 	return nil
 }
 
