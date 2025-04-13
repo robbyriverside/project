@@ -8,7 +8,6 @@
 package logs
 
 import (
-  "fmt"
   "os"
   "strings"
   "sync"
@@ -96,8 +95,10 @@ func InitLogger(env string) {
       zap.String("env", Options.Environment),
     ))
     if err != nil {
-      // Fallback to a no-op logger or panic
-      fmt.Println("Failed to init logger:", err)
+      // Create a fallback development logger to report the error
+      fallback := zap.NewExample().Sugar()
+      fallback.Errorf("Failed to initialize logger: %v", err)
+      logger = fallback // Use the fallback logger going forward
       return
     }
 
@@ -105,10 +106,78 @@ func InitLogger(env string) {
   })
 }
 
-// VLogf is a convenience for verbose console prints (not structured).
-// Typically used for very chatty debugging messages that don't belong in structured logs.
-func VLogf(format string, args ...interface{}) {
+// Debug uses fmt.Sprint to construct and log a message.
+// Only logs if Options.Verbose is true.
+func Debug(args ...interface{}) {
   if Options.Verbose {
-    fmt.Printf("[verbose] "+format+"\n", args...)
+    Logger().Debug(args...)
   }
+}
+
+// Info uses fmt.Sprint to construct and log a message.
+func Info(args ...interface{}) {
+  Logger().Info(args...)
+}
+
+// Warn uses fmt.Sprint to construct and log a message.
+func Warn(args ...interface{}) {
+  Logger().Warn(args...)
+}
+
+// Error uses fmt.Sprint to construct and log a message.
+func Error(args ...interface{}) {
+  Logger().Error(args...)
+}
+
+// DPanic uses fmt.Sprint to construct and log a message. In development, the logger then panics.
+func DPanic(args ...interface{}) {
+  Logger().DPanic(args...)
+}
+
+// Panic uses fmt.Sprint to construct and log a message, then panics.
+func Panic(args ...interface{}) {
+  Logger().Panic(args...)
+}
+
+// Fatal uses fmt.Sprint to construct and log a message, then calls os.Exit(1).
+func Fatal(args ...interface{}) {
+  Logger().Fatal(args...)
+}
+
+// Debugf uses fmt.Sprintf to construct and log a message.
+// Only logs if Options.Verbose is true.
+func Debugf(format string, args ...interface{}) {
+  if Options.Verbose {
+    Logger().Debugf(format, args...)
+  }
+}
+
+// Infof uses fmt.Sprintf to construct and log a message.
+func Infof(format string, args ...interface{}) {
+  Logger().Infof(format, args...)
+}
+
+// Warnf uses fmt.Sprintf to construct and log a message.
+func Warnf(format string, args ...interface{}) {
+  Logger().Warnf(format, args...)
+}
+
+// Errorf uses fmt.Sprintf to construct and log a message.
+func Errorf(format string, args ...interface{}) {
+  Logger().Errorf(format, args...)
+}
+
+// DPanicf uses fmt.Sprintf to construct and log a message. In development, the logger then panics.
+func DPanicf(format string, args ...interface{}) {
+  Logger().DPanicf(format, args...)
+}
+
+// Panicf uses fmt.Sprintf to construct and log a message, then panics.
+func Panicf(format string, args ...interface{}) {
+  Logger().Panicf(format, args...)
+}
+
+// Fatalf uses fmt.Sprintf to construct and log a message, then calls os.Exit(1).
+func Fatalf(format string, args ...interface{}) {
+  Logger().Fatalf(format, args...)
 }

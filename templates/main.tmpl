@@ -42,7 +42,7 @@ func main() {
   logs.Options.Version = Version
   logs.InitLogger(os.Getenv("ENV"))
 
-  logs.Logger().Infof("Starting {{.ProjectName}} (version=%s, commit=%s, built=%s)",
+  logs.Infof("Starting {{.ProjectName}} (version=%s, commit=%s, built=%s)",
     Version, Commit, BuildTime)
 }
 

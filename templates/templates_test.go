@@ -191,9 +191,6 @@ replace (
 				t.Fatalf("failed to write output file: %v", err)
 			}
 
-			// Print generated file for inspection
-			fmt.Printf("\n=== Generated %s ===\n%s\n=== End of %s ===\n", tc.outputFile, output, tc.outputFile)
-
 			// Verify output
 			switch tc.tmplFile {
 			case "taskfile.tmpl":
