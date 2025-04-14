@@ -49,3 +49,15 @@ tasks:
       - echo 'Version = {{ "{{.VERSION}}" }}'
       - echo 'Commit = {{ "{{.COMMIT}}" }}'
       - echo 'Built at = {{ "{{.BUILDTIME}}" }}'
+
+  install:
+    desc: Install the CLI to /usr/local/bin
+    deps:
+      - build
+    cmds:
+      - sudo cp {{ "{{.OUT}}" }} /usr/local/bin/{{ "{{.APP}}" }}
+
+  uninstall:
+    desc: Uninstall the CLI from /usr/local/bin
+    cmds:
+      - sudo rm /usr/local/bin/{{ "{{.APP}}" }}
