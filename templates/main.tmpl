@@ -135,6 +135,6 @@ func (cmd *DescribeConfigCmd) Execute(args []string) error {
 type AboutCommand struct{}
 
 func (cmd *AboutCommand) Execute(args []string) error {
-  fmt.Println({{.ProjectName}}.About(Version))
+  fmt.Println({{.ProjectName}}.About())
   return nil
 }

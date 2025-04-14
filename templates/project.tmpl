@@ -1,10 +1,14 @@
 package {{.ProjectName}}
 
+import (
+	"{{.ModuleURL}}/logs"
+)
+
 // About returns information about the project.
 // TODO: Update the company and website information below
-func About(version string) string {
+func About() string {
 	return `Project: {{.ProjectName}}
-Version: ` + version + `
+Version: ` + logs.Options.Version + `
 Description: This is a generated project using the {{.ProjectName}} package.
 Author: Your Name
 Company: Example Corp
