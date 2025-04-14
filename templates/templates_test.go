@@ -191,6 +191,23 @@ replace (
 			}
 			output := buf.String()
 
+			// For taskfile.tmpl, post-process VAR: patterns
+			if tc.tmplFile == "taskfile.tmpl" {
+				replacements := []struct{ old, new string }{
+					{"VAR:VERSION", "{{.VERSION}}"},
+					{"VAR:COMMIT", "{{.COMMIT}}"},
+					{"VAR:BUILDTIME", "{{.BUILDTIME}}"},
+					{"VAR:MAIN", "{{.MAIN}}"},
+					{"VAR:CLI_ARGS", "{{.CLI_ARGS}}"},
+					{"VAR:LDFLAGS", "{{.LDFLAGS}}"},
+					{"VAR:APP", "{{.APP}}"},
+					{`"VAR:OUT"`, `"{{.OUT}}"`}, // Special case for generates
+				}
+				for _, r := range replacements {
+					output = strings.ReplaceAll(output, r.old, r.new)
+				}
+			}
+
 			// Write the generated file
 			if err := os.WriteFile(filepath.Join(outputDir, tc.outputFile), []byte(output), 0644); err != nil {
 				t.Fatalf("failed to write output file: %v", err)

@@ -151,7 +151,7 @@ func (g *Generator) filePath(fileType string) string {
 	}
 }
 
-// postProcessTaskfile replaces .Task.Get calls with simpler variables in the generated Taskfile.yaml
+// postProcessTaskfile replaces VAR: patterns with task variables in the generated Taskfile.yaml
 func (g *Generator) postProcessTaskfile() error {
 	taskfilePath := filepath.Join(g.Config.ProjectPath(), "Taskfile.yaml")
 	content, err := os.ReadFile(taskfilePath)
@@ -159,16 +159,16 @@ func (g *Generator) postProcessTaskfile() error {
 		return fmt.Errorf("failed to read Taskfile: %w", err)
 	}
 
-	// Replace all .Task.Get calls with simple variables
+	// Replace all VAR: patterns with task variables
 	replacements := []struct{ old, new string }{
-		{`{{.Task.Get "VERSION"}}`, "{{.VERSION}}"},
-		{`{{.Task.Get "COMMIT"}}`, "{{.COMMIT}}"},
-		{`{{.Task.Get "BUILDTIME"}}`, "{{.BUILDTIME}}"},
-		{`{{.Task.Get "MAIN"}}`, "{{.MAIN}}"},
-		{`{{.Task.Get "CLI_ARGS"}}`, "{{.CLI_ARGS}}"},
-		{`{{.Task.Get "OUT"}}`, "{{.OUT}}"},
-		{`{{.Task.Get "LDFLAGS"}}`, "{{.LDFLAGS}}"},
-		{`{{.Task.Get "APP"}}`, "{{.APP}}"},
+		{"VAR:VERSION", "{{.VERSION}}"},
+		{"VAR:COMMIT", "{{.COMMIT}}"},
+		{"VAR:BUILDTIME", "{{.BUILDTIME}}"},
+		{"VAR:MAIN", "{{.MAIN}}"},
+		{"VAR:CLI_ARGS", "{{.CLI_ARGS}}"},
+		{"VAR:OUT", "{{.OUT}}"},
+		{"VAR:LDFLAGS", "{{.LDFLAGS}}"},
+		{"VAR:APP", "{{.APP}}"},
 	}
 
 	newContent := string(content)

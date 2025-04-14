@@ -13,26 +13,26 @@ vars:
     sh: date -u +%Y-%m-%dT%H:%M:%SZ
 
   LDFLAGS: >-
-    -X 'main.Version={{`{{.Task.Get "VERSION"}}`}}'
-    -X 'main.Commit={{`{{.Task.Get "COMMIT"}}`}}'
-    -X 'main.BuildTime={{`{{.Task.Get "BUILDTIME"}}`}}'
+    -X main.Version=VAR:VERSION
+    -X main.Commit=VAR:COMMIT
+    -X main.BuildTime=VAR:BUILDTIME
 
 tasks:
   build:
     desc: Build the CLI with version info
     cmds:
       - mkdir -p bin
-      - go build -ldflags '{{`{{.Task.Get "LDFLAGS"}}`}}' -o {{`{{.Task.Get "OUT"}}`}} {{`{{.Task.Get "MAIN"}}`}}'
-      - chmod +x {{`{{.Task.Get "OUT"}}`}}'
+      - go build -ldflags "VAR:LDFLAGS" -o VAR:OUT VAR:MAIN
+      - chmod +x VAR:OUT
     sources:
       - "**/*.go"
     generates:
-      - '{{`{{.Task.Get "OUT"}}`}}'
+      - "VAR:OUT"
 
   run:
     desc: Run the CLI
     cmds:
-      - go run {{`{{.Task.Get "MAIN"}}`}} {{`{{.Task.Get "CLI_ARGS"}}`}}
+      - go run VAR:MAIN VAR:CLI_ARGS
     silent: true
 
   clean:
@@ -43,18 +43,18 @@ tasks:
   version:
     desc: Show build version metadata
     cmds:
-      - echo 'Version = {{`{{.Task.Get "VERSION"}}`}}'
-      - echo 'Commit = {{`{{.Task.Get "COMMIT"}}`}}'
-      - echo 'Built at = {{`{{.Task.Get "BUILDTIME"}}`}}'
+      - echo "Version = VAR:VERSION"
+      - echo "Commit = VAR:COMMIT"
+      - echo "Built at = VAR:BUILDTIME"
 
   install:
     desc: Install the CLI to /usr/local/bin
     deps:
       - build
     cmds:
-      - sudo cp {{`{{.Task.Get "OUT"}}`}} /usr/local/bin/{{`{{.Task.Get "APP"}}`}}
+      - sudo cp VAR:OUT /usr/local/bin/VAR:APP
 
   uninstall:
     desc: Uninstall the CLI from /usr/local/bin
     cmds:
-      - sudo rm /usr/local/bin/{{`{{.Task.Get "APP"}}`}}
+      - sudo rm /usr/local/bin/VAR:APP
