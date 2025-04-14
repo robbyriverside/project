@@ -7,8 +7,9 @@ import (
 
   "github.com/jessevdk/go-flags"
 
-  "github.com/example/{{.ProjectName}}/config"
-  "github.com/example/{{.ProjectName}}/logs"
+  "{{.ModuleURL}}/config"
+  "{{.ModuleURL}}/logs"
+  "{{.ModuleURL}}"
 )
 
 // Version, Commit, and BuildTime are set at build time via -ldflags.
@@ -39,6 +40,13 @@ func main() {
     "Manage configuration",
     "Get or set configuration values",
     &ConfigCommand{},
+  )
+
+  parser.AddCommand(
+    "about",
+    "Show about info",
+    "Prints information about the project",
+    &AboutCommand{},
   )
 
   _, err := parser.Parse()
@@ -120,5 +128,13 @@ func (cmd *DescribeConfigCmd) Execute(args []string) error {
   for _, line := range lines {
     fmt.Println(line)
   }
+  return nil
+}
+
+// AboutCommand prints out about info
+type AboutCommand struct{}
+
+func (cmd *AboutCommand) Execute(args []string) error {
+  fmt.Println({{.ProjectName}}.About(Version))
   return nil
 }

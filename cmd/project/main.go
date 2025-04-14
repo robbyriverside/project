@@ -146,7 +146,7 @@ func (cmd *GenCommand) Execute(args []string) error {
 
 	// Create your Generator with a TmplDir pointing to where your .tmpl files live
 	gen := &project.Generator{
-		TmplDir: "templates", // or wherever your templates/ folder is located
+		Config: project.NewGenConfig(moduleURL, outputDir),
 	}
 
 	// Call GenerateAll with the processed moduleURL & dir

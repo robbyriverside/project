@@ -22,3 +22,16 @@ tasks:
     desc: Remove built artifacts
     cmds:
       - rm -rf bin
+
+  install:
+    desc: Install the 'project' CLI to /usr/local/bin
+    deps:
+      - build
+    cmds:
+      - sudo mkdir -p /usr/local/bin
+      - sudo cp bin/project /usr/local/bin/
+
+  uninstall:
+    desc: Uninstall the 'project' CLI from /usr/local/bin
+    cmds:
+      - sudo rm /usr/local/bin/project

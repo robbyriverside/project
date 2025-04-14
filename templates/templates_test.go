@@ -18,6 +18,7 @@ type TemplateData struct {
 	ModuleURL   string
 	HomeDir     string
 	MainPath    string
+	Version     string
 }
 
 // taskVarMap is a map of task variables that should be preserved in the output
@@ -58,6 +59,7 @@ require (
 )
 
 replace (
+	github.com/example/testapp => .
 	github.com/example/testapp/config => ./config
 	github.com/example/testapp/logs => ./logs
 )
@@ -75,6 +77,21 @@ replace (
 		}
 	}{
 		{
+			name:       "project template",
+			tmplFile:   "project.tmpl",
+			outputFile: "project.go",
+			data: struct {
+				TemplateData
+				Task taskVarMap
+			}{
+				TemplateData: TemplateData{
+					ProjectName: "testapp",
+					Version:    "v0.1.0",
+					ModuleURL:  "github.com/example/testapp",
+				},
+			},
+		},
+		{
 			name:       "taskfile template",
 			tmplFile:   "taskfile.tmpl",
 			outputFile: "Taskfile.yaml",
@@ -85,6 +102,7 @@ replace (
 				TemplateData: TemplateData{
 					ProjectName: "testapp",
 					MainPath:    "./cmd/testapp",
+					ModuleURL:  "github.com/example/testapp",
 				},
 				Task: taskVarMap{
 					"VERSION":   "",
@@ -107,6 +125,7 @@ replace (
 			}{
 				TemplateData: TemplateData{
 					ProjectName: "testapp",
+					ModuleURL:  "github.com/example/testapp",
 				},
 			},
 		},
@@ -121,6 +140,7 @@ replace (
 				TemplateData: TemplateData{
 					ProjectName: "testapp",
 					HomeDir:     "~/testapp",
+					ModuleURL:  "github.com/example/testapp",
 				},
 			},
 		},
@@ -134,6 +154,7 @@ replace (
 			}{
 				TemplateData: TemplateData{
 					ProjectName: "testapp",
+					ModuleURL:  "github.com/example/testapp",
 				},
 			},
 		},
@@ -151,23 +172,7 @@ replace (
 			// For taskfile.tmpl, replace Task variables with our taskVar function
 			content := string(tmplContent)
 			if tc.tmplFile == "taskfile.tmpl" {
-				replacements := []struct{ old, new string }{
-					{`{{ "{{.VERSION}}" }}`, `{{.Task.Get "VERSION"}}`},
-					{`{{ "{{.COMMIT}}" }}`, `{{.Task.Get "COMMIT"}}`},
-					{`{{ "{{.BUILDTIME}}" }}`, `{{.Task.Get "BUILDTIME"}}`},
-					{`{{ "{{.LDFLAGS}}" }}`, `{{.Task.Get "LDFLAGS"}}`},
-					{`{{ "{{.OUT}}" }}`, `{{.Task.Get "OUT"}}`},
-					{`{{ "{{.MAIN}}" }}`, `{{.Task.Get "MAIN"}}`},
-					{`{{ "{{.CLI_ARGS}}" }}`, `{{.Task.Get "CLI_ARGS"}}`},
-					// Also replace direct Task variables in the vars section
-					{`.VERSION`, `.Task.Get "VERSION"`},
-					{`.COMMIT`, `.Task.Get "COMMIT"`},
-					{`.BUILDTIME`, `.Task.Get "BUILDTIME"`},
-					{`.LDFLAGS`, `.Task.Get "LDFLAGS"`},
-					{`.OUT`, `.Task.Get "OUT"`},
-					{`.MAIN`, `.Task.Get "MAIN"`},
-					{`.CLI_ARGS`, `.Task.Get "CLI_ARGS"`},
-				}
+				replacements := []struct{ old, new string }{}
 				for _, r := range replacements {
 					content = strings.ReplaceAll(content, r.old, r.new)
 				}
@@ -193,6 +198,13 @@ replace (
 
 			// Verify output
 			switch tc.tmplFile {
+			case "project.tmpl":
+				if !strings.Contains(output, tc.data.ProjectName) {
+					t.Errorf("project output missing project name")
+				}
+				if !strings.Contains(output, "version + `") {
+					t.Errorf("project output missing version parameter")
+				}
 			case "taskfile.tmpl":
 				if !strings.Contains(output, tc.data.ProjectName) {
 					t.Errorf("taskfile output missing project name")
@@ -236,7 +248,18 @@ replace (
 	}
 
 	// After all files are written, initialize the module
-	cmd := exec.Command("go", "mod", "tidy")
+	if err := os.Remove(filepath.Join(outputDir, "go.mod")); err != nil && !os.IsNotExist(err) {
+		t.Fatalf("failed to remove existing go.mod: %v", err)
+	}
+
+	cmd := exec.Command("go", "mod", "init", "github.com/example/testapp")
+	cmd.Dir = outputDir
+	cmd.Env = append(os.Environ(), "GO111MODULE=on")
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("failed to initialize module: %v\n%s", err, output)
+	}
+
+	cmd = exec.Command("go", "mod", "tidy")
 	cmd.Dir = outputDir
 	cmd.Env = append(os.Environ(), "GO111MODULE=on")
 	if output, err := cmd.CombinedOutput(); err != nil {

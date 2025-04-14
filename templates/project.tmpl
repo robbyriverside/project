@@ -1,0 +1,13 @@
+package {{.ProjectName}}
+
+// About returns information about the project.
+// TODO: Update the company and website information below
+func About(version string) string {
+	return `Project: {{.ProjectName}}
+Version: ` + version + `
+Description: This is a generated project using the {{.ProjectName}} package.
+Author: Your Name
+Company: Example Corp
+Website: https://example.com
+License: MIT`
+}

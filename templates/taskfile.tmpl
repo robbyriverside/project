@@ -12,30 +12,27 @@ vars:
   BUILDTIME:
     sh: date -u +%Y-%m-%dT%H:%M:%SZ
 
-  # We need to produce literal {{.VERSION}}, etc. in the final Taskfile,
-  # so we escape braces using {{ "{{.VERSION}}" }} to ensure the Go template
-  # doesn't consume them.
   LDFLAGS: >-
-    -X 'main.Version={{ "{{.VERSION}}" }}'
-    -X 'main.Commit={{ "{{.COMMIT}}" }}'
-    -X 'main.BuildTime={{ "{{.BUILDTIME}}" }}'
+    -X 'main.Version={{`{{.Task.Get "VERSION"}}`}}'
+    -X 'main.Commit={{`{{.Task.Get "COMMIT"}}`}}'
+    -X 'main.BuildTime={{`{{.Task.Get "BUILDTIME"}}`}}'
 
 tasks:
   build:
     desc: Build the CLI with version info
     cmds:
       - mkdir -p bin
-      - go build -ldflags '{{ "{{.LDFLAGS}}" }}' -o {{ "{{.OUT}}" }} {{ "{{.MAIN}}" }}
-      - chmod +x {{ "{{.OUT}}" }}
+      - go build -ldflags '{{`{{.Task.Get "LDFLAGS"}}`}}' -o {{`{{.Task.Get "OUT"}}`}} {{`{{.Task.Get "MAIN"}}`}}'
+      - chmod +x {{`{{.Task.Get "OUT"}}`}}'
     sources:
       - "**/*.go"
     generates:
-      - '{{ "{{.OUT}}" }}'
+      - '{{`{{.Task.Get "OUT"}}`}}'
 
   run:
     desc: Run the CLI
     cmds:
-      - go run {{ "{{.MAIN}}" }} {{ "{{.CLI_ARGS}}" }}
+      - go run {{`{{.Task.Get "MAIN"}}`}} {{`{{.Task.Get "CLI_ARGS"}}`}}
     silent: true
 
   clean:
@@ -46,18 +43,18 @@ tasks:
   version:
     desc: Show build version metadata
     cmds:
-      - echo 'Version = {{ "{{.VERSION}}" }}'
-      - echo 'Commit = {{ "{{.COMMIT}}" }}'
-      - echo 'Built at = {{ "{{.BUILDTIME}}" }}'
+      - echo 'Version = {{`{{.Task.Get "VERSION"}}`}}'
+      - echo 'Commit = {{`{{.Task.Get "COMMIT"}}`}}'
+      - echo 'Built at = {{`{{.Task.Get "BUILDTIME"}}`}}'
 
   install:
     desc: Install the CLI to /usr/local/bin
     deps:
       - build
     cmds:
-      - sudo cp {{ "{{.OUT}}" }} /usr/local/bin/{{ "{{.APP}}" }}
+      - sudo cp {{`{{.Task.Get "OUT"}}`}} /usr/local/bin/{{`{{.Task.Get "APP"}}`}}
 
   uninstall:
     desc: Uninstall the CLI from /usr/local/bin
     cmds:
-      - sudo rm /usr/local/bin/{{ "{{.APP}}" }}
+      - sudo rm /usr/local/bin/{{`{{.Task.Get "APP"}}`}}

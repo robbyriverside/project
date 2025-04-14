@@ -3,6 +3,7 @@ package project
 import (
 	"bytes"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -48,8 +49,25 @@ func (gc *GenConfig) ProjectPath() string {
 
 // Generator coordinates the template lookups and file generation.
 type Generator struct {
-	Config  *GenConfig
-	TmplDir string
+	Config *GenConfig
+}
+
+func (g *Generator) readTemplate(name string) (*template.Template, error) {
+	fsys, err := fs.Sub(templateFS, "templates")
+	if err != nil {
+		return nil, fmt.Errorf("failed to read template %s: %w", name, err)
+	}
+	content, err := fs.ReadFile(fsys, name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read template %s: %w", name, err)
+	}
+
+	tmpl, err := template.New(name).Parse(string(content))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse template %s: %w", name, err)
+	}
+
+	return tmpl, nil
 }
 
 // GenerateAll creates the config and runs each file generation plus go mod steps.
@@ -66,9 +84,17 @@ func (g *Generator) GenerateAll(moduleURL, outDir string) error {
 		}
 	}
 
+	// Post-process Taskfile.yaml
+	if err := g.postProcessTaskfile(); err != nil {
+		return fmt.Errorf("failed to post-process Taskfile.yaml: %w", err)
+	}
+
 	// Finally do go mod init + tidy
 	if err := g.InitMod(); err != nil {
 		return fmt.Errorf("go mod init failed: %w", err)
+	}
+	if err := g.addReplaceDirectives(); err != nil {
+		return fmt.Errorf("failed to add replace directives: %w", err)
 	}
 	if err := g.ModTidy(); err != nil {
 		return fmt.Errorf("go mod tidy failed: %w", err)
@@ -80,18 +106,9 @@ func (g *Generator) GenerateAll(moduleURL, outDir string) error {
 // GenerateFile reads <fileType>.tmpl, executes it with g.Config, writes the result.
 func (g *Generator) GenerateFile(fileType string) error {
 	tplName := fileType + ".tmpl"
-	tplPath := filepath.Join(g.TmplDir, tplName)
-
-	// Load the template from disk
-	tplBytes, err := os.ReadFile(tplPath)
+	tpl, err := g.readTemplate(tplName)
 	if err != nil {
-		return fmt.Errorf("failed to read template %s: %w", tplPath, err)
-	}
-
-	// Parse
-	tpl, err := template.New(fileType).Parse(string(tplBytes))
-	if err != nil {
-		return fmt.Errorf("failed to parse template %s: %w", fileType, err)
+		return err
 	}
 
 	// Execute
@@ -134,14 +151,90 @@ func (g *Generator) filePath(fileType string) string {
 	}
 }
 
+// postProcessTaskfile replaces .Task.Get calls with simpler variables in the generated Taskfile.yaml
+func (g *Generator) postProcessTaskfile() error {
+	taskfilePath := filepath.Join(g.Config.ProjectPath(), "Taskfile.yaml")
+	content, err := os.ReadFile(taskfilePath)
+	if err != nil {
+		return fmt.Errorf("failed to read Taskfile: %w", err)
+	}
+
+	// Replace all .Task.Get calls with simple variables
+	replacements := []struct{ old, new string }{
+		{`{{.Task.Get "VERSION"}}`, "{{.VERSION}}"},
+		{`{{.Task.Get "COMMIT"}}`, "{{.COMMIT}}"},
+		{`{{.Task.Get "BUILDTIME"}}`, "{{.BUILDTIME}}"},
+		{`{{.Task.Get "MAIN"}}`, "{{.MAIN}}"},
+		{`{{.Task.Get "CLI_ARGS"}}`, "{{.CLI_ARGS}}"},
+		{`{{.Task.Get "OUT"}}`, "{{.OUT}}"},
+		{`{{.Task.Get "LDFLAGS"}}`, "{{.LDFLAGS}}"},
+		{`{{.Task.Get "APP"}}`, "{{.APP}}"},
+	}
+
+	newContent := string(content)
+	for _, r := range replacements {
+		newContent = strings.ReplaceAll(newContent, r.old, r.new)
+	}
+
+	if err := os.WriteFile(taskfilePath, []byte(newContent), 0644); err != nil {
+		return fmt.Errorf("failed to write Taskfile: %w", err)
+	}
+
+	return nil
+}
+
 // InitMod runs `go mod init <moduleURL>` in the project folder
 func (g *Generator) InitMod() error {
 	pp := g.Config.ProjectPath()
+	modPath := filepath.Join(pp, "go.mod")
+	
+	// Check if go.mod already exists
+	if _, err := os.Stat(modPath); err == nil {
+		// go.mod exists, skip initialization
+		return nil
+	} else if !os.IsNotExist(err) {
+		// Some other error occurred
+		return fmt.Errorf("failed to check for go.mod: %w", err)
+	}
+	
 	cmd := exec.Command("go", "mod", "init", g.Config.ModuleURL)
 	cmd.Dir = pp
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	return cmd.Run()
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to run go mod init: %w", err)
+	}
+	return nil
+}
+
+// addReplaceDirectives adds replace directives to go.mod for local packages
+func (g *Generator) addReplaceDirectives() error {
+	pp := g.Config.ProjectPath()
+	modPath := filepath.Join(pp, "go.mod")
+
+	content, err := os.ReadFile(modPath)
+	if err != nil {
+		return fmt.Errorf("failed to read go.mod: %w", err)
+	}
+
+	// Add replace directives if they don't exist
+	replaces := fmt.Sprintf(`
+
+replace (
+	%[1]s => .
+	%[1]s/config => ./config
+	%[1]s/logs => ./logs
+)
+`, g.Config.ModuleURL)
+
+	if !strings.Contains(string(content), "replace (") {
+		newContent := string(content) + replaces
+		if err := os.WriteFile(modPath, []byte(newContent), 0644); err != nil {
+			return fmt.Errorf("failed to write go.mod: %w", err)
+		}
+	}
+
+	return nil
 }
 
 // ModTidy runs `go mod tidy` in the project folder
